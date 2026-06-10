@@ -667,14 +667,6 @@
     }
 
     function makeGuess(guess) {
-      if (currentPlayer === 1 && p1Solved) {
-        currentPlayer = 2;
-      }
-
-      if (currentPlayer === 2 && p2Solved) {
-        currentPlayer = 1;
-      }
-
       if (currentPlayer === 1) {
         p1Attempts++;
 
@@ -682,37 +674,28 @@
           p1Solved = true;
           message = "Player 1 Correct!";
           subMessage = `Player 2's number was ${p2Secret}`;
-          footerMessage = `Player 1 solved it in ${p1Attempts} guesses`;
+          footerMessage = `P1 solved it in ${p1Attempts} guesses!`;
           burstParticles(["#ff007a", "#ffe600", "#00ff88"]);
         } else if (guess < p2Secret) {
           p1WrongGuesses.add(guess);
-          message = "Too Low";
+          message = "P1: Too Low ↑";
           subMessage = "Player 1, guess higher";
           footerMessage = `P1 attempts: ${p1Attempts}`;
           spawnParticles("#00e5ff");
         } else {
           p1WrongGuesses.add(guess);
-          message = "Too High";
+          message = "P1: Too High ↓";
           subMessage = "Player 1, guess lower";
           footerMessage = `P1 attempts: ${p1Attempts}`;
           spawnParticles("#ff4fd8");
         }
 
         input.value = "";
-
-        if (!p2Solved) {
-          currentPlayer = 2;
-          setTimeout(() => {
-            if (!p1Solved || !p2Solved) {
-              message = "Player 2 Guess";
-              subMessage = "Guess Player 1's secret number";
-              footerMessage = "Player 2's turn";
-              broadcastState();
-            }
-          }, 900);
-        }
-
         checkWinner();
+        if (phase !== "game_over") {
+          // Give P2 a turn only if they haven't already solved
+          currentPlayer = p2Solved ? 1 : 2;
+        }
         broadcastState();
         return;
       }
@@ -724,37 +707,28 @@
           p2Solved = true;
           message = "Player 2 Correct!";
           subMessage = `Player 1's number was ${p1Secret}`;
-          footerMessage = `Player 2 solved it in ${p2Attempts} guesses`;
+          footerMessage = `P2 solved it in ${p2Attempts} guesses!`;
           burstParticles(["#00e5ff", "#ffe600", "#00ff88"]);
         } else if (guess < p1Secret) {
           p2WrongGuesses.add(guess);
-          message = "Too Low";
+          message = "P2: Too Low ↑";
           subMessage = "Player 2, guess higher";
           footerMessage = `P2 attempts: ${p2Attempts}`;
           spawnParticles("#00e5ff");
         } else {
           p2WrongGuesses.add(guess);
-          message = "Too High";
+          message = "P2: Too High ↓";
           subMessage = "Player 2, guess lower";
           footerMessage = `P2 attempts: ${p2Attempts}`;
           spawnParticles("#ff4fd8");
         }
 
         input.value = "";
-
-        if (!p1Solved) {
-          currentPlayer = 1;
-          setTimeout(() => {
-            if (!p1Solved || !p2Solved) {
-              message = "Player 1 Guess";
-              subMessage = "Guess Player 2's secret number";
-              footerMessage = "Player 1's turn";
-              broadcastState();
-            }
-          }, 900);
-        }
-
         checkWinner();
+        if (phase !== "game_over") {
+          // Give P1 a turn only if they haven't already solved
+          currentPlayer = p1Solved ? 2 : 1;
+        }
         broadcastState();
       }
     }
