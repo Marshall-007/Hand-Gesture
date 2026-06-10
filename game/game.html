@@ -379,6 +379,8 @@
       footerMessage = state.footerMessage;
       input.type = state.inputType || "number";
       input.placeholder = state.inputPlaceholder || "Your guess";
+      input.min = (state.inputType === "number") ? "1" : "";
+      input.max = (state.inputType === "number") ? "150" : "";
       mainButton.textContent = state.mainButtonText || "Guess";
       // Only clear input if the player hasn't started typing something
       if (!input.value || !canLocalUserAct()) {
@@ -579,9 +581,20 @@
           return;
         }
 
+        const localValue = Number(input.value);
+        if (!localValue || localValue < 1 || localValue > 150) {
+          message = "Invalid Number";
+          subMessage = "Enter a number from 1 to 150";
+          footerMessage = "Try again";
+          shakeScreen();
+          return;
+        }
+
         if (conn && conn.open) {
-          conn.send({ type: "action", value: Number(input.value) });
+          conn.send({ type: "action", value: localValue });
           input.value = "";
+        } else {
+          setOnlineStatus(`Room ${roomCode}: not connected. Rejoin as P2.`);
         }
         return;
       }
@@ -604,7 +617,8 @@
         subMessage = "Enter a number from 1 to 150";
         footerMessage = "Try again";
         shakeScreen();
-        broadcastState();
+        // Don't broadcast invalid-number state to other player
+        updateInputAvailability();
         return;
       }
 
@@ -637,6 +651,8 @@
 
         input.value = "";
         input.type = "number";
+        input.min = "1";
+        input.max = "150";
         input.placeholder = "Your guess";
         mainButton.textContent = "Guess";
 
