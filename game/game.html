@@ -164,7 +164,7 @@
       <input id="roomCodeInput" type="text" placeholder="Room code (example: battle7)" maxlength="24" />
       <button id="hostButton">Host As P1</button>
       <button id="joinButton" class="small-btn">Join As P2</button>
-      <p id="onlineStatus" class="online-status">Local mode: both players on one device.</p>
+      <p id="onlineStatus" class="online-status">Online mode: both players can use this same page URL.</p>
     </div>
 
     <p class="hint">
@@ -221,6 +221,7 @@
 
     const BASE_WIDTH = 460;
     const BASE_HEIGHT = 520;
+    const DEFAULT_ROOM_CODE = "hand-gesture-live";
 
     mainButton.addEventListener("click", handleAction);
     resetButton.addEventListener("click", handleResetAction);
@@ -246,6 +247,10 @@
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "")
         .slice(0, 24);
+    }
+
+    function getDesiredRoomCode() {
+      return sanitizeRoomCode(roomCodeInput.value) || DEFAULT_ROOM_CODE;
     }
 
     function setOnlineStatus(text) {
@@ -295,6 +300,17 @@
         setOnlineStatus(`Online room ${roomCode}: your turn (P${myPlayer}).`);
       } else {
         setOnlineStatus(`Online room ${roomCode}: waiting for P${currentPlayer}.`);
+      }
+    }
+
+    function resetPeerState() {
+      if (conn) {
+        conn = null;
+      }
+
+      if (peer) {
+        peer.destroy();
+        peer = null;
       }
     }
 
@@ -385,29 +401,36 @@
       });
 
       conn.on("close", () => {
+        if (conn !== connection) {
+          return;
+        }
+
         setOnlineStatus("Connection closed. You can host/join again.");
         onlineMode = false;
+        conn = null;
         updateInputAvailability();
+      });
+
+      conn.on("error", () => {
+        setOnlineStatus(`Connection error in room ${roomCode}. Retry host/join.`);
       });
     }
 
     function hostRoom() {
-      const code = sanitizeRoomCode(roomCodeInput.value) || Math.random().toString(36).slice(2, 8);
+      const code = getDesiredRoomCode();
       roomCodeInput.value = code;
       roomCode = code;
       myPlayer = 1;
       isHost = true;
 
-      if (peer) {
-        peer.destroy();
-      }
+      resetPeerState();
 
       peer = new Peer(`secret-battle-${code}`);
 
       peer.on("open", () => {
         onlineMode = true;
         setRoomInUrl(code);
-        setOnlineStatus(`Hosting room ${code} as P1. Share this page link so P2 can join.`);
+        setOnlineStatus(`Hosting room ${code} as P1. Player 2 can open this same page and tap Join As P2.`);
         updateInputAvailability();
       });
 
@@ -421,20 +444,14 @@
     }
 
     function joinRoom() {
-      const code = sanitizeRoomCode(roomCodeInput.value);
-
-      if (!code) {
-        setOnlineStatus("Enter a room code first.");
-        return;
-      }
+      const code = getDesiredRoomCode();
 
       roomCode = code;
+      roomCodeInput.value = code;
       myPlayer = 2;
       isHost = false;
 
-      if (peer) {
-        peer.destroy();
-      }
+      resetPeerState();
 
       peer = new Peer();
 
@@ -873,11 +890,9 @@
       requestAnimationFrame(draw);
     }
 
-    const initialRoomCode = sanitizeRoomCode(new URLSearchParams(window.location.search).get("room"));
-    if (initialRoomCode) {
-      roomCodeInput.value = initialRoomCode;
-      setOnlineStatus(`Room ${initialRoomCode} detected. Host as P1 or join as P2.`);
-    }
+    const initialRoomCode = sanitizeRoomCode(new URLSearchParams(window.location.search).get("room")) || DEFAULT_ROOM_CODE;
+    roomCodeInput.value = initialRoomCode;
+    setOnlineStatus(`Room ${initialRoomCode} ready. Player 1 taps Host As P1, Player 2 taps Join As P2.`);
 
     resizeCanvas();
     resetGame();
