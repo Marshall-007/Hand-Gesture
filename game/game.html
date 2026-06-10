@@ -283,12 +283,13 @@
     }
 
     function canLocalUserAct() {
-      if (isHost && !hostReady) {
+      // Block all game interaction until the player has hosted or joined
+      if (!onlineMode) {
         return false;
       }
 
-      if (!onlineMode) {
-        return true;
+      if (isHost && !hostReady) {
+        return false;
       }
 
       return canPlayerAct(myPlayer);
@@ -305,6 +306,7 @@
       }
 
       if (!onlineMode) {
+        setOnlineStatus(`Host this room as P1 or join as P2 to start playing.`);
         return;
       }
 
@@ -378,7 +380,10 @@
       input.type = state.inputType || "number";
       input.placeholder = state.inputPlaceholder || "Your guess";
       mainButton.textContent = state.mainButtonText || "Guess";
-      input.value = "";
+      // Only clear input if the player hasn't started typing something
+      if (!input.value || !canLocalUserAct()) {
+        input.value = "";
+      }
       updateInputAvailability();
     }
 
@@ -581,7 +586,7 @@
         return;
       }
 
-      const actor = fromRemote ? 2 : 1;
+      const actor = fromRemote ? 2 : myPlayer;
       if (onlineMode && isHost && !canPlayerAct(actor) && phase !== "game_over") {
         return;
       }
