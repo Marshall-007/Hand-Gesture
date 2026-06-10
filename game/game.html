@@ -90,6 +90,30 @@
       line-height: 1.4;
     }
 
+    .online-controls {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .online-controls input {
+      width: 100%;
+      grid-column: span 2;
+      font-size: 15px;
+      padding: 10px;
+    }
+
+    .online-status {
+      grid-column: span 2;
+      font-size: 12px;
+      opacity: 0.85;
+      text-align: left;
+      min-height: 16px;
+      padding: 2px 2px 0;
+    }
+
     @media (max-width: 600px) {
       .game-wrap {
         width: min(96vw, 460px);
@@ -113,6 +137,15 @@
       .hint {
         font-size: 13px;
       }
+
+      .online-controls {
+        grid-template-columns: 1fr;
+      }
+
+      .online-controls input,
+      .online-status {
+        grid-column: span 1;
+      }
     }
   </style>
 </head>
@@ -124,7 +157,14 @@
     <div class="controls">
       <input id="numberInput" type="password" inputmode="numeric" placeholder="1 - 150" />
       <button id="mainButton">Lock P1 Number</button>
-      <button class="small-btn" onclick="resetGame()">Reset</button>
+      <button id="resetButton" class="small-btn">Reset</button>
+    </div>
+
+    <div class="online-controls">
+      <input id="roomCodeInput" type="text" placeholder="Room code (example: battle7)" maxlength="24" />
+      <button id="hostButton">Host As P1</button>
+      <button id="joinButton" class="small-btn">Join As P2</button>
+      <p id="onlineStatus" class="online-status">Local mode: both players on one device.</p>
     </div>
 
     <p class="hint">
@@ -132,12 +172,18 @@
     </p>
   </div>
 
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
     const input = document.getElementById("numberInput");
     const mainButton = document.getElementById("mainButton");
+    const resetButton = document.getElementById("resetButton");
+    const roomCodeInput = document.getElementById("roomCodeInput");
+    const hostButton = document.getElementById("hostButton");
+    const joinButton = document.getElementById("joinButton");
+    const onlineStatus = document.getElementById("onlineStatus");
 
     let p1Secret = null;
     let p2Secret = null;
@@ -166,10 +212,20 @@
     let pulse = 0;
     let shake = 0;
 
+    let onlineMode = false;
+    let isHost = false;
+    let myPlayer = 1;
+    let peer = null;
+    let conn = null;
+    let roomCode = "";
+
     const BASE_WIDTH = 460;
     const BASE_HEIGHT = 520;
 
     mainButton.addEventListener("click", handleAction);
+    resetButton.addEventListener("click", handleResetAction);
+    hostButton.addEventListener("click", hostRoom);
+    joinButton.addEventListener("click", joinRoom);
 
     input.addEventListener("keydown", function(event) {
       if (event.key === "Enter") {
@@ -183,6 +239,214 @@
       canvas.width = BASE_WIDTH;
       canvas.height = BASE_HEIGHT;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+    function sanitizeRoomCode(value) {
+      return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
+        .slice(0, 24);
+    }
+
+    function setOnlineStatus(text) {
+      onlineStatus.textContent = text;
+    }
+
+    function setRoomInUrl(code) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", code);
+      window.history.replaceState({}, "", url.toString());
+    }
+
+    function canPlayerAct(player) {
+      if (phase === "p1_set") {
+        return player === 1;
+      }
+
+      if (phase === "p2_set") {
+        return player === 2;
+      }
+
+      if (phase === "guessing") {
+        return player === currentPlayer;
+      }
+
+      return true;
+    }
+
+    function canLocalUserAct() {
+      if (!onlineMode) {
+        return true;
+      }
+
+      return canPlayerAct(myPlayer);
+    }
+
+    function updateInputAvailability() {
+      const canAct = canLocalUserAct();
+      input.disabled = !canAct;
+      mainButton.disabled = !canAct;
+
+      if (!onlineMode) {
+        return;
+      }
+
+      if (canAct) {
+        setOnlineStatus(`Online room ${roomCode}: your turn (P${myPlayer}).`);
+      } else {
+        setOnlineStatus(`Online room ${roomCode}: waiting for P${currentPlayer}.`);
+      }
+    }
+
+    function getStateSnapshot() {
+      return {
+        p1Secret,
+        p2Secret,
+        phase,
+        currentPlayer,
+        p1Attempts,
+        p2Attempts,
+        p1WrongGuesses: Array.from(p1WrongGuesses),
+        p2WrongGuesses: Array.from(p2WrongGuesses),
+        p1Wins,
+        p2Wins,
+        ties,
+        p1Solved,
+        p2Solved,
+        message,
+        subMessage,
+        footerMessage,
+        inputType: input.type,
+        inputPlaceholder: input.placeholder,
+        mainButtonText: mainButton.textContent
+      };
+    }
+
+    function applyStateSnapshot(state) {
+      p1Secret = state.p1Secret;
+      p2Secret = state.p2Secret;
+      phase = state.phase;
+      currentPlayer = state.currentPlayer;
+      p1Attempts = state.p1Attempts;
+      p2Attempts = state.p2Attempts;
+      p1WrongGuesses = new Set(state.p1WrongGuesses || []);
+      p2WrongGuesses = new Set(state.p2WrongGuesses || []);
+      p1Wins = state.p1Wins;
+      p2Wins = state.p2Wins;
+      ties = state.ties;
+      p1Solved = state.p1Solved;
+      p2Solved = state.p2Solved;
+      message = state.message;
+      subMessage = state.subMessage;
+      footerMessage = state.footerMessage;
+      input.type = state.inputType || "number";
+      input.placeholder = state.inputPlaceholder || "Your guess";
+      mainButton.textContent = state.mainButtonText || "Guess";
+      input.value = "";
+      updateInputAvailability();
+    }
+
+    function broadcastState() {
+      if (onlineMode && isHost && conn && conn.open) {
+        conn.send({ type: "state", payload: getStateSnapshot() });
+      }
+      updateInputAvailability();
+    }
+
+    function attachConnHandlers(connection) {
+      conn = connection;
+
+      conn.on("data", data => {
+        if (isHost) {
+          if (data.type === "action") {
+            handleAction(data.value, true);
+          }
+
+          if (data.type === "reset") {
+            resetGame();
+            broadcastState();
+          }
+
+          return;
+        }
+
+        if (data.type === "state") {
+          applyStateSnapshot(data.payload);
+        }
+      });
+
+      conn.on("open", () => {
+        onlineMode = true;
+        setOnlineStatus(`Connected in room ${roomCode}. You are P${myPlayer}.`);
+        updateInputAvailability();
+        if (isHost) {
+          broadcastState();
+        }
+      });
+
+      conn.on("close", () => {
+        setOnlineStatus("Connection closed. You can host/join again.");
+        onlineMode = false;
+        updateInputAvailability();
+      });
+    }
+
+    function hostRoom() {
+      const code = sanitizeRoomCode(roomCodeInput.value) || Math.random().toString(36).slice(2, 8);
+      roomCodeInput.value = code;
+      roomCode = code;
+      myPlayer = 1;
+      isHost = true;
+
+      if (peer) {
+        peer.destroy();
+      }
+
+      peer = new Peer(`secret-battle-${code}`);
+
+      peer.on("open", () => {
+        onlineMode = true;
+        setRoomInUrl(code);
+        setOnlineStatus(`Hosting room ${code} as P1. Share this page link so P2 can join.`);
+        updateInputAvailability();
+      });
+
+      peer.on("connection", connection => {
+        attachConnHandlers(connection);
+      });
+
+      peer.on("error", err => {
+        setOnlineStatus(`Host error: ${err.type || "connection failed"}.`);
+      });
+    }
+
+    function joinRoom() {
+      const code = sanitizeRoomCode(roomCodeInput.value);
+
+      if (!code) {
+        setOnlineStatus("Enter a room code first.");
+        return;
+      }
+
+      roomCode = code;
+      myPlayer = 2;
+      isHost = false;
+
+      if (peer) {
+        peer.destroy();
+      }
+
+      peer = new Peer();
+
+      peer.on("open", () => {
+        const connection = peer.connect(`secret-battle-${code}`);
+        attachConnHandlers(connection);
+        setOnlineStatus(`Joining room ${code} as P2...`);
+      });
+
+      peer.on("error", err => {
+        setOnlineStatus(`Join error: ${err.type || "room unavailable"}.`);
+      });
     }
 
     function resetGame() {
@@ -211,13 +475,45 @@
       mainButton.textContent = "Lock P1 Number";
 
       particles = [];
+      updateInputAvailability();
     }
 
-    function handleAction() {
-      const value = Number(input.value);
+    function handleResetAction() {
+      if (onlineMode && !isHost) {
+        if (conn && conn.open) {
+          conn.send({ type: "reset" });
+        }
+        return;
+      }
+
+      resetGame();
+      broadcastState();
+    }
+
+    function handleAction(forcedValue = null, fromRemote = false) {
+      if (onlineMode && !isHost && !fromRemote) {
+        if (!canLocalUserAct()) {
+          setOnlineStatus(`Room ${roomCode}: wait for your turn.`);
+          return;
+        }
+
+        if (conn && conn.open) {
+          conn.send({ type: "action", value: Number(input.value) });
+          input.value = "";
+        }
+        return;
+      }
+
+      const actor = fromRemote ? 2 : 1;
+      if (onlineMode && isHost && !canPlayerAct(actor) && phase !== "game_over") {
+        return;
+      }
+
+      const value = forcedValue !== null ? Number(forcedValue) : Number(input.value);
 
       if (phase === "game_over") {
         resetGame();
+        broadcastState();
         return;
       }
 
@@ -226,6 +522,7 @@
         subMessage = "Enter a number from 1 to 150";
         footerMessage = "Try again";
         shakeScreen();
+        broadcastState();
         return;
       }
 
@@ -242,6 +539,7 @@
         mainButton.textContent = "Lock P2 Number";
 
         spawnParticles("#00e5ff");
+        broadcastState();
         return;
       }
 
@@ -261,6 +559,7 @@
         mainButton.textContent = "Guess";
 
         burstParticles(["#ff007a", "#00e5ff"]);
+        broadcastState();
         return;
       }
 
@@ -310,11 +609,13 @@
               message = "Player 2 Guess";
               subMessage = "Guess Player 1's secret number";
               footerMessage = "Player 2's turn";
+              broadcastState();
             }
           }, 900);
         }
 
         checkWinner();
+        broadcastState();
         return;
       }
 
@@ -350,11 +651,13 @@
               message = "Player 1 Guess";
               subMessage = "Guess Player 2's secret number";
               footerMessage = "Player 1's turn";
+              broadcastState();
             }
           }, 900);
         }
 
         checkWinner();
+        broadcastState();
       }
     }
 
@@ -568,6 +871,12 @@
       drawNumberGrid(offsetX, offsetY);
 
       requestAnimationFrame(draw);
+    }
+
+    const initialRoomCode = sanitizeRoomCode(new URLSearchParams(window.location.search).get("room"));
+    if (initialRoomCode) {
+      roomCodeInput.value = initialRoomCode;
+      setOnlineStatus(`Room ${initialRoomCode} detected. Host as P1 or join as P2.`);
     }
 
     resizeCanvas();
