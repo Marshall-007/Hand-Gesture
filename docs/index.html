@@ -218,6 +218,9 @@
     let peer = null;
     let conn = null;
     let roomCode = "";
+    let hostReady = false;
+    let joinRetryTimer = null;
+    let joinAttempts = 0;
 
     const BASE_WIDTH = 460;
     const BASE_HEIGHT = 520;
@@ -280,6 +283,10 @@
     }
 
     function canLocalUserAct() {
+      if (isHost && !hostReady) {
+        return false;
+      }
+
       if (!onlineMode) {
         return true;
       }
@@ -291,6 +298,11 @@
       const canAct = canLocalUserAct();
       input.disabled = !canAct;
       mainButton.disabled = !canAct;
+
+      if (isHost && !hostReady) {
+        setOnlineStatus(`Opening host room ${roomCode || getDesiredRoomCode()}...`);
+        return;
+      }
 
       if (!onlineMode) {
         return;
@@ -304,6 +316,14 @@
     }
 
     function resetPeerState() {
+      if (joinRetryTimer) {
+        clearTimeout(joinRetryTimer);
+        joinRetryTimer = null;
+      }
+
+      joinAttempts = 0;
+      hostReady = false;
+
       if (conn) {
         conn = null;
       }
@@ -411,9 +431,42 @@
         updateInputAvailability();
       });
 
-      conn.on("error", () => {
+      conn.on("error", err => {
+        if (!isHost && err && err.type === "peer-unavailable") {
+          scheduleJoinRetry();
+          return;
+        }
+
         setOnlineStatus(`Connection error in room ${roomCode}. Retry host/join.`);
       });
+    }
+
+    function scheduleJoinRetry() {
+      if (joinAttempts >= 8) {
+        setOnlineStatus(`Join failed for room ${roomCode}. Make sure P1 tapped Host As P1 and keeps the page open.`);
+        return;
+      }
+
+      if (joinRetryTimer) {
+        clearTimeout(joinRetryTimer);
+      }
+
+      joinAttempts += 1;
+      setOnlineStatus(`Waiting for P1 in room ${roomCode}... retry ${joinAttempts}/8`);
+      joinRetryTimer = setTimeout(() => {
+        joinRetryTimer = null;
+        attemptJoinConnection();
+      }, 1200);
+    }
+
+    function attemptJoinConnection() {
+      if (!peer || !peer.open) {
+        return;
+      }
+
+      const connection = peer.connect(`secret-battle-${roomCode}`, { reliable: true });
+      attachConnHandlers(connection);
+      setOnlineStatus(`Joining room ${roomCode} as P2...`);
     }
 
     function hostRoom() {
@@ -424,10 +477,12 @@
       isHost = true;
 
       resetPeerState();
+      updateInputAvailability();
 
       peer = new Peer(`secret-battle-${code}`);
 
       peer.on("open", () => {
+        hostReady = true;
         onlineMode = true;
         setRoomInUrl(code);
         setOnlineStatus(`Hosting room ${code} as P1. Player 2 can open this same page and tap Join As P2.`);
@@ -439,7 +494,8 @@
       });
 
       peer.on("error", err => {
-        setOnlineStatus(`Host error: ${err.type || "connection failed"}.`);
+        hostReady = false;
+        setOnlineStatus(`Host error: ${err.type || "connection failed"}. Try Host As P1 again.`);
       });
     }
 
@@ -456,12 +512,16 @@
       peer = new Peer();
 
       peer.on("open", () => {
-        const connection = peer.connect(`secret-battle-${code}`);
-        attachConnHandlers(connection);
-        setOnlineStatus(`Joining room ${code} as P2...`);
+        onlineMode = true;
+        attemptJoinConnection();
       });
 
       peer.on("error", err => {
+        if (err && err.type === "peer-unavailable") {
+          scheduleJoinRetry();
+          return;
+        }
+
         setOnlineStatus(`Join error: ${err.type || "room unavailable"}.`);
       });
     }
