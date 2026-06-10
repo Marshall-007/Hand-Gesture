@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2 Player Secret Number Battle</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #ff3cac, #221b4d 45%, #050510);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      overflow-x: hidden;
+      padding: 12px;
+    }
+
+    .game-wrap {
+      width: min(95vw, 460px);
+      text-align: center;
+      padding: 16px;
+    }
+
+    canvas {
+      width: 100%;
+      aspect-ratio: 460 / 520;
+      height: auto;
+      display: block;
+      border-radius: 28px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 0 35px rgba(255, 60, 172, 0.5);
+    }
+
+    .controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    input {
+      width: 170px;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      font-size: 18px;
+      text-align: center;
+      outline: none;
+      background: white;
+      color: #111;
+      font-weight: bold;
+    }
+
+    button {
+      padding: 14px 16px;
+      border: none;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(135deg, #ff007a, #6c2cff);
+      box-shadow: 0 0 18px rgba(255, 0, 122, 0.45);
+      transition: transform 0.15s ease;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    .small-btn {
+      background: linear-gradient(135deg, #00c6ff, #0072ff);
+    }
+
+    .hint {
+      margin-top: 12px;
+      opacity: 0.8;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 600px) {
+      .game-wrap {
+        width: min(96vw, 460px);
+        padding: 10px;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      input,
+      button {
+        width: 100%;
+      }
+
+      input {
+        font-size: 16px;
+      }
+
+      .hint {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="game-wrap">
+    <canvas id="gameCanvas" width="460" height="520"></canvas>
+
+    <div class="controls">
+      <input id="numberInput" type="password" inputmode="numeric" placeholder="1 - 150" />
+      <button id="mainButton">Lock P1 Number</button>
+      <button class="small-btn" onclick="resetGame()">Reset</button>
+    </div>
+
+    <p class="hint">
+      Both players secretly lock in a number. Then take turns guessing each other’s number.
+    </p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const input = document.getElementById("numberInput");
+    const mainButton = document.getElementById("mainButton");
+
+    let p1Secret = null;
+    let p2Secret = null;
+
+    let phase = "p1_set";
+    let currentPlayer = 1;
+
+    let p1Attempts = 0;
+    let p2Attempts = 0;
+
+    let p1Wins = 0;
+    let p2Wins = 0;
+    let ties = 0;
+
+    let p1Solved = false;
+    let p2Solved = false;
+
+    let message = "Player 1";
+    let subMessage = "Secretly choose your number";
+    let footerMessage = "Player 2, look away 👀";
+
+    let particles = [];
+    let pulse = 0;
+    let shake = 0;
+
+    const BASE_WIDTH = 460;
+    const BASE_HEIGHT = 520;
+
+    mainButton.addEventListener("click", handleAction);
+
+    input.addEventListener("keydown", function(event) {
+      if (event.key === "Enter") {
+        handleAction();
+      }
+    });
+
+    window.addEventListener("resize", resizeCanvas);
+
+    function resizeCanvas() {
+      canvas.width = BASE_WIDTH;
+      canvas.height = BASE_HEIGHT;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+    function resetGame() {
+      p1Secret = null;
+      p2Secret = null;
+
+      phase = "p1_set";
+      currentPlayer = 1;
+
+      p1Attempts = 0;
+      p2Attempts = 0;
+
+      p1Solved = false;
+      p2Solved = false;
+
+      message = "Player 1";
+      subMessage = "Secretly choose your number";
+      footerMessage = "Player 2, look away 👀";
+
+      input.value = "";
+      input.type = "password";
+      input.placeholder = "1 - 150";
+      mainButton.textContent = "Lock P1 Number";
+
+      particles = [];
+    }
+
+    function handleAction() {
+      const value = Number(input.value);
+
+      if (phase === "game_over") {
+        resetGame();
+        return;
+      }
+
+      if (!value || value < 1 || value > 150) {
+        message = "Invalid Number";
+        subMessage = "Enter a number from 1 to 150";
+        footerMessage = "Try again";
+        shakeScreen();
+        return;
+      }
+
+      if (phase === "p1_set") {
+        p1Secret = value;
+
+        phase = "p2_set";
+        message = "Player 2";
+        subMessage = "Secretly choose your number";
+        footerMessage = "Player 1, look away 👀";
+
+        input.value = "";
+        input.type = "password";
+        mainButton.textContent = "Lock P2 Number";
+
+        spawnParticles("#00e5ff");
+        return;
+      }
+
+      if (phase === "p2_set") {
+        p2Secret = value;
+
+        phase = "guessing";
+        currentPlayer = 1;
+
+        message = "Player 1 Guess";
+        subMessage = "Guess Player 2's secret number";
+        footerMessage = "Player 1 goes first";
+
+        input.value = "";
+        input.type = "number";
+        input.placeholder = "Your guess";
+        mainButton.textContent = "Guess";
+
+        burstParticles(["#ff007a", "#00e5ff"]);
+        return;
+      }
+
+      if (phase === "guessing") {
+        makeGuess(value);
+      }
+    }
+
+    function makeGuess(guess) {
+      if (currentPlayer === 1 && p1Solved) {
+        currentPlayer = 2;
+      }
+
+      if (currentPlayer === 2 && p2Solved) {
+        currentPlayer = 1;
+      }
+
+      if (currentPlayer === 1) {
+        p1Attempts++;
+
+        if (guess === p2Secret) {
+          p1Solved = true;
+          message = "Player 1 Correct!";
+          subMessage = `Player 2's number was ${p2Secret}`;
+          footerMessage = `Player 1 solved it in ${p1Attempts} guesses`;
+          burstParticles(["#ff007a", "#ffe600", "#00ff88"]);
+        } else if (guess < p2Secret) {
+          message = "Too Low";
+          subMessage = "Player 1, guess higher";
+          footerMessage = `P1 attempts: ${p1Attempts}`;
+          spawnParticles("#00e5ff");
+        } else {
+          message = "Too High";
+          subMessage = "Player 1, guess lower";
+          footerMessage = `P1 attempts: ${p1Attempts}`;
+          spawnParticles("#ff4fd8");
+        }
+
+        input.value = "";
+
+        if (!p2Solved) {
+          currentPlayer = 2;
+          setTimeout(() => {
+            if (!p1Solved || !p2Solved) {
+              message = "Player 2 Guess";
+              subMessage = "Guess Player 1's secret number";
+              footerMessage = "Player 2's turn";
+            }
+          }, 900);
+        }
+
+        checkWinner();
+        return;
+      }
+
+      if (currentPlayer === 2) {
+        p2Attempts++;
+
+        if (guess === p1Secret) {
+          p2Solved = true;
+          message = "Player 2 Correct!";
+          subMessage = `Player 1's number was ${p1Secret}`;
+          footerMessage = `Player 2 solved it in ${p2Attempts} guesses`;
+          burstParticles(["#00e5ff", "#ffe600", "#00ff88"]);
+        } else if (guess < p1Secret) {
+          message = "Too Low";
+          subMessage = "Player 2, guess higher";
+          footerMessage = `P2 attempts: ${p2Attempts}`;
+          spawnParticles("#00e5ff");
+        } else {
+          message = "Too High";
+          subMessage = "Player 2, guess lower";
+          footerMessage = `P2 attempts: ${p2Attempts}`;
+          spawnParticles("#ff4fd8");
+        }
+
+        input.value = "";
+
+        if (!p1Solved) {
+          currentPlayer = 1;
+          setTimeout(() => {
+            if (!p1Solved || !p2Solved) {
+              message = "Player 1 Guess";
+              subMessage = "Guess Player 2's secret number";
+              footerMessage = "Player 1's turn";
+            }
+          }, 900);
+        }
+
+        checkWinner();
+      }
+    }
+
+    function checkWinner() {
+      if (p1Solved && p2Solved) {
+        phase = "game_over";
+        input.value = "";
+        input.type = "number";
+        mainButton.textContent = "Play Again";
+
+        if (p1Attempts < p2Attempts) {
+          p1Wins++;
+          message = "Player 1 Wins!";
+          subMessage = `P1: ${p1Attempts} guesses | P2: ${p2Attempts} guesses`;
+          footerMessage = "Fewer guesses wins";
+        } else if (p2Attempts < p1Attempts) {
+          p2Wins++;
+          message = "Player 2 Wins!";
+          subMessage = `P1: ${p1Attempts} guesses | P2: ${p2Attempts} guesses`;
+          footerMessage = "Fewer guesses wins";
+        } else {
+          ties++;
+          message = "It's A Tie!";
+          subMessage = `Both solved it in ${p1Attempts} guesses`;
+          footerMessage = "Rematch?";
+        }
+
+        burstParticles(["#ff007a", "#00e5ff", "#ffe600", "#00ff88", "#ffffff"]);
+      }
+    }
+
+    function spawnParticles(color) {
+      for (let i = 0; i < 22; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 0.5) * 6,
+          r: Math.random() * 5 + 2,
+          color: color,
+          life: 45
+        });
+      }
+    }
+
+    function burstParticles(colors) {
+      for (let i = 0; i < 110; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 12,
+          vy: (Math.random() - 0.5) * 12,
+          r: Math.random() * 6 + 2,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          life: 80
+        });
+      }
+    }
+
+    function shakeScreen() {
+      shake = 12;
+    }
+
+    function drawBackground(offsetX, offsetY) {
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, "#240046");
+      gradient.addColorStop(0.5, "#10002b");
+      gradient.addColorStop(1, "#030014");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(offsetX, offsetY, canvas.width, canvas.height);
+
+      for (let i = 0; i < 30; i++) {
+        const x = (i * 53 + pulse * 1.7) % canvas.width;
+        const y = (i * 79 + pulse * 1.2) % canvas.height;
+
+        ctx.fillStyle = "rgba(255,255,255,0.07)";
+        ctx.beginPath();
+        ctx.arc(x + offsetX, y + offsetY, 2 + Math.sin(pulse / 12 + i) * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < 7; i++) {
+        ctx.beginPath();
+        ctx.arc(
+          canvas.width / 2 + offsetX,
+          canvas.height / 2 + offsetY,
+          70 + i * 25 + Math.sin(pulse / 20) * 5,
+          0,
+          Math.PI * 2
+        );
+        ctx.stroke();
+      }
+    }
+
+    function drawParticles(offsetX, offsetY) {
+      particles.forEach((p, index) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+
+        ctx.globalAlpha = Math.max(0, p.life / 80);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x + offsetX, p.y + offsetY, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        if (p.life <= 0) {
+          particles.splice(index, 1);
+        }
+      });
+    }
+
+    function drawText(offsetX, offsetY) {
+      ctx.textAlign = "center";
+
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText("SECRET NUMBER BATTLE", canvas.width / 2 + offsetX, 45 + offsetY);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 42px Arial";
+      ctx.shadowColor = "#ff4fd8";
+      ctx.shadowBlur = 20;
+      ctx.fillText(message, canvas.width / 2 + offsetX, 130 + offsetY);
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "20px Arial";
+      ctx.fillText(subMessage, canvas.width / 2 + offsetX, 180 + offsetY);
+
+      ctx.fillStyle = "#ffe600";
+      ctx.font = "bold 28px Arial";
+      ctx.fillText("Range: 1 - 150", canvas.width / 2 + offsetX, 245 + offsetY);
+
+      ctx.fillStyle = "#00ff88";
+      ctx.font = "bold 23px Arial";
+      ctx.fillText(`P1 Guesses: ${p1Attempts}`, canvas.width / 2 + offsetX, 305 + offsetY);
+
+      ctx.fillStyle = "#00e5ff";
+      ctx.font = "bold 23px Arial";
+      ctx.fillText(`P2 Guesses: ${p2Attempts}`, canvas.width / 2 + offsetX, 345 + offsetY);
+
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText(`Wins  P1: ${p1Wins}  |  P2: ${p2Wins}  |  Ties: ${ties}`, canvas.width / 2 + offsetX, 390 + offsetY);
+
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.font = "16px Arial";
+      ctx.fillText(footerMessage, canvas.width / 2 + offsetX, 440 + offsetY);
+    }
+
+    function draw() {
+      pulse++;
+
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (shake > 0) {
+        offsetX = (Math.random() - 0.5) * shake;
+        offsetY = (Math.random() - 0.5) * shake;
+        shake *= 0.85;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawBackground(offsetX, offsetY);
+      drawParticles(offsetX, offsetY);
+      drawText(offsetX, offsetY);
+
+      requestAnimationFrame(draw);
+    }
+
+    resizeCanvas();
+    resetGame();
+    draw();
+  </script>
+</body>
+</html>
