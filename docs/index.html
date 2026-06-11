@@ -1,957 +1,698 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>2 Player Secret Number Battle</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Secret Number Battle</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--pink:#ff007a;--cyan:#00e5ff;--green:#00ff88;--yellow:#ffe600;--bg1:#0a0a1a;--bg2:#1a1a3e;--bg3:#0f0f2d;--card:rgba(255,255,255,0.06);--border:rgba(255,255,255,0.1);--text:#e8e8f0}
+body{min-height:100vh;background:linear-gradient(160deg,var(--bg1),var(--bg2),var(--bg3));font-family:'Segoe UI',Arial,sans-serif;color:var(--text);display:flex;align-items:center;justify-content:center;padding:12px;overflow-x:hidden}
+.container{width:100%;max-width:500px;min-height:80vh;display:flex;flex-direction:column}
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
-    }
+/* ── LOBBY ── */
+.lobby-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px 24px;text-align:center;backdrop-filter:blur(8px)}
+.lobby-card h1{font-size:26px;background:linear-gradient(135deg,var(--pink),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;letter-spacing:1px}
+.lobby-card .sub{font-size:13px;opacity:.65;margin-bottom:24px}
+.lobby-card label{display:block;text-align:left;font-size:12px;font-weight:700;opacity:.6;margin:14px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+.lobby-card input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border);font-size:16px;background:rgba(255,255,255,0.08);color:#fff;outline:none;transition:border .2s}
+.lobby-card input:focus{border-color:var(--pink)}
+.lobby-card input::placeholder{color:rgba(255,255,255,0.3)}
+.lobby-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+.btn{padding:14px 12px;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;color:#fff;transition:transform .15s,opacity .2s;outline:none}
+.btn:hover:not(:disabled){transform:scale(1.04)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-primary{background:linear-gradient(135deg,var(--pink),#6c2cff);box-shadow:0 0 20px rgba(255,0,122,.3)}
+.btn-secondary{background:linear-gradient(135deg,var(--cyan),#0072ff);box-shadow:0 0 20px rgba(0,229,255,.2)}
+.btn-sm{padding:10px 14px;font-size:13px;border-radius:10px}
+.btn-green{background:linear-gradient(135deg,var(--green),#00b874)}
+.btn-yellow{background:linear-gradient(135deg,var(--yellow),#ff9900);color:#111}
+.btn-outline{background:transparent;border:1px solid var(--border);font-weight:600;font-size:13px}
+.btn-outline:hover:not(:disabled){background:rgba(255,255,255,0.06)}
+.lobby-status{margin-top:16px;font-size:13px;min-height:20px;line-height:1.4;opacity:.85}
+.lobby-status.error{color:#ff4f6f}
+.share-row{margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:center}
+.share-row .link-text{font-size:11px;background:rgba(0,0,0,.3);padding:6px 10px;border-radius:8px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--cyan);flex:1;text-align:left}
 
-    body {
-      min-height: 100vh;
-      background: radial-gradient(circle at top, #ff3cac, #221b4d 45%, #050510);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      overflow-x: hidden;
-      padding: 12px;
-    }
+/* ── GAME SCREEN ── */
+.game-screen{display:flex;flex-direction:column;height:100%;flex:1}
+.game-header{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:10px;backdrop-filter:blur(8px)}
+.game-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.game-title-row h2{font-size:14px;opacity:.6;font-weight:600;letter-spacing:.5px}
+.room-badge{font-size:11px;background:rgba(255,255,255,0.1);padding:4px 10px;border-radius:8px;color:var(--cyan)}
+.players-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.player-info{flex:1;text-align:center}
+.player-info .p-label{font-size:10px;text-transform:uppercase;font-weight:700;letter-spacing:.5px;opacity:.5}
+.player-info .p-name{font-size:14px;font-weight:700;margin:2px 0}
+.player-info .p-name.me{color:var(--cyan)}
+.player-info .p-score{font-size:22px;font-weight:800}
+.p1c{color:var(--pink)}
+.p2c{color:var(--cyan)}
+.vs-badge{font-size:13px;font-weight:800;opacity:.35}
+.round-badge{text-align:center;font-size:11px;opacity:.5;margin-top:6px}
+.my-secret{font-size:11px;text-align:center;margin-top:6px;opacity:.6}
+.my-secret span{background:rgba(255,255,255,0.08);padding:3px 10px;border-radius:8px;font-weight:700;letter-spacing:1px;color:var(--yellow)}
 
-    .game-wrap {
-      width: min(95vw, 460px);
-      text-align: center;
-      padding: 16px;
-    }
+/* ── LOG ── */
+.game-log{flex:1;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px;margin-bottom:10px;min-height:180px;max-height:50vh;scroll-behavior:smooth}
+.log-entry{padding:8px 12px;margin-bottom:6px;border-radius:10px;font-size:13px;line-height:1.5;border-left:3px solid transparent;background:rgba(255,255,255,0.03)}
+.log-entry.system{border-left-color:rgba(255,255,255,0.15);font-style:italic;opacity:.65;font-size:12px}
+.log-entry.question{border-left-color:var(--cyan);background:rgba(0,229,255,0.06)}
+.log-entry.answer{border-left-color:var(--green);background:rgba(0,255,136,0.06)}
+.log-entry.guess-wrong{border-left-color:var(--pink);background:rgba(255,0,122,0.06)}
+.log-entry.guess-correct{border-left-color:var(--yellow);background:rgba(255,230,0,0.1);font-weight:700}
+.log-entry.round-divider{text-align:center;font-weight:800;font-size:14px;border-left-color:transparent;background:rgba(255,255,255,0.04);color:var(--yellow);letter-spacing:1px;padding:10px}
+.log-entry.winner-banner{text-align:center;font-weight:800;font-size:16px;padding:14px;border-left-color:transparent;background:linear-gradient(135deg,rgba(255,0,122,0.15),rgba(0,229,255,0.15));border-radius:12px;margin:8px 0}
 
-    canvas {
-      width: 100%;
-      aspect-ratio: 460 / 520;
-      height: auto;
-      display: block;
-      border-radius: 28px;
-      background: rgba(0, 0, 0, 0.35);
-      border: 2px solid rgba(255, 255, 255, 0.18);
-      box-shadow: 0 0 35px rgba(255, 60, 172, 0.5);
-    }
+/* ── ACTION PANEL ── */
+.action-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;backdrop-filter:blur(8px)}
+.action-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px}
+.action-row{display:flex;gap:8px;align-items:center}
+.action-row input{flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.08);color:#fff;font-size:16px;outline:none}
+.action-row input:focus{border-color:var(--pink)}
+.action-row input::placeholder{color:rgba(255,255,255,0.3)}
+.mode-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.answer-btns{display:flex;gap:10px;justify-content:center;margin-top:4px}
+.answer-btns .btn{min-width:100px;font-size:16px}
+.pending-q{text-align:center;font-size:15px;padding:10px;margin-bottom:8px;background:rgba(0,229,255,0.08);border-radius:10px;line-height:1.5}
+.pending-q em{color:var(--cyan);font-style:normal;font-weight:700}
+.waiting-msg{text-align:center;padding:10px;font-size:14px;opacity:.7}
+.waiting-msg .dot-pulse{display:inline-block;animation:pulse-dot 1.4s infinite}
+@keyframes pulse-dot{0%,80%,100%{opacity:.3}40%{opacity:1}}
+.play-again-wrap{text-align:center;padding:6px 0}
 
-    .controls {
-      margin-top: 16px;
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
+.hidden{display:none!important}
 
-    input {
-      width: 170px;
-      padding: 14px;
-      border-radius: 14px;
-      border: none;
-      font-size: 18px;
-      text-align: center;
-      outline: none;
-      background: white;
-      color: #111;
-      font-weight: bold;
-    }
+/* Scrollbar */
+.game-log::-webkit-scrollbar{width:5px}
+.game-log::-webkit-scrollbar-track{background:transparent}
+.game-log::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:4px}
 
-    button {
-      padding: 14px 16px;
-      border: none;
-      border-radius: 14px;
-      font-size: 15px;
-      font-weight: bold;
-      cursor: pointer;
-      color: white;
-      background: linear-gradient(135deg, #ff007a, #6c2cff);
-      box-shadow: 0 0 18px rgba(255, 0, 122, 0.45);
-      transition: transform 0.15s ease;
-    }
-
-    button:hover {
-      transform: scale(1.05);
-    }
-
-    .small-btn {
-      background: linear-gradient(135deg, #00c6ff, #0072ff);
-    }
-
-    .hint {
-      margin-top: 12px;
-      opacity: 0.8;
-      font-size: 14px;
-      line-height: 1.4;
-    }
-
-    .online-controls {
-      margin-top: 10px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .online-controls input {
-      width: 100%;
-      grid-column: span 2;
-      font-size: 15px;
-      padding: 10px;
-    }
-
-    .online-status {
-      grid-column: span 2;
-      font-size: 12px;
-      opacity: 0.85;
-      text-align: left;
-      min-height: 16px;
-      padding: 2px 2px 0;
-    }
-
-    @media (max-width: 600px) {
-      .game-wrap {
-        width: min(96vw, 460px);
-        padding: 10px;
-      }
-
-      .controls {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      input,
-      button {
-        width: 100%;
-      }
-
-      input {
-        font-size: 16px;
-      }
-
-      .hint {
-        font-size: 13px;
-      }
-
-      .online-controls {
-        grid-template-columns: 1fr;
-      }
-
-      .online-controls input,
-      .online-status {
-        grid-column: span 1;
-      }
-    }
-  </style>
+@media(max-width:500px){
+  .lobby-card{padding:24px 16px}
+  .lobby-card h1{font-size:22px}
+  .game-header{padding:12px}
+  .action-panel{padding:12px}
+  .players-row{gap:4px}
+}
+</style>
 </head>
-
 <body>
-  <div class="game-wrap">
-    <canvas id="gameCanvas" width="460" height="520"></canvas>
 
-    <div class="controls">
-      <input id="numberInput" type="password" inputmode="numeric" placeholder="1 - 150" />
-      <button id="mainButton">Lock P1 Number</button>
-      <button id="resetButton" class="small-btn">Reset</button>
-    </div>
+<!-- ════════ LOBBY ════════ -->
+<div class="container" id="lobbyContainer">
+<div class="lobby-card">
+  <h1>⚔️ SECRET NUMBER BATTLE</h1>
+  <p class="sub">Guess each other's secret number — play from anywhere!</p>
 
-    <div class="online-controls">
-      <input id="roomCodeInput" type="text" placeholder="Room code (example: battle7)" maxlength="24" />
-      <button id="hostButton">Host As P1</button>
-      <button id="joinButton" class="small-btn">Join As P2</button>
-      <p id="onlineStatus" class="online-status">Online mode: both players can use this same page URL.</p>
-    </div>
+  <label for="nameInput">Your Name</label>
+  <input id="nameInput" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off"/>
 
-    <p class="hint">
-      Both players secretly lock in a number. Then take turns guessing each other’s number.
-    </p>
+  <label for="roomInput">Room Code</label>
+  <input id="roomInput" type="text" placeholder="e.g. battle7" maxlength="24" autocomplete="off"/>
+
+  <div class="lobby-btns">
+    <button class="btn btn-primary" id="hostBtn">Create Room (P1)</button>
+    <button class="btn btn-secondary" id="joinBtn">Join Room (P2)</button>
   </div>
 
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
+  <div id="shareRow" class="share-row hidden">
+    <span class="link-text" id="shareLink"></span>
+    <button class="btn btn-outline btn-sm" id="copyBtn">📋 Copy</button>
+  </div>
 
-    const input = document.getElementById("numberInput");
-    const mainButton = document.getElementById("mainButton");
-    const resetButton = document.getElementById("resetButton");
-    const roomCodeInput = document.getElementById("roomCodeInput");
-    const hostButton = document.getElementById("hostButton");
-    const joinButton = document.getElementById("joinButton");
-    const onlineStatus = document.getElementById("onlineStatus");
+  <p class="lobby-status" id="lobbyStatus"></p>
+</div>
+</div>
 
-    let p1Secret = null;
-    let p2Secret = null;
+<!-- ════════ GAME ════════ -->
+<div class="container hidden" id="gameContainer">
+<div class="game-screen">
 
-    let phase = "p1_set";
-    let currentPlayer = 1;
+  <div class="game-header">
+    <div class="game-title-row">
+      <h2>⚔️ SECRET NUMBER BATTLE</h2>
+      <span class="room-badge" id="gRoomBadge"></span>
+    </div>
+    <div class="players-row">
+      <div class="player-info">
+        <div class="p-label p1c">Player 1</div>
+        <div class="p-name" id="gP1Name">—</div>
+        <div class="p-score p1c" id="gP1Score">0</div>
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="player-info">
+        <div class="p-label p2c">Player 2</div>
+        <div class="p-name" id="gP2Name">—</div>
+        <div class="p-score p2c" id="gP2Score">0</div>
+      </div>
+    </div>
+    <div class="round-badge" id="gRoundBadge">Round 1</div>
+    <div class="my-secret hidden" id="mySecretDisplay">Your secret: <span id="mySecretNum">—</span></div>
+  </div>
 
-    let p1Attempts = 0;
-    let p2Attempts = 0;
+  <div class="game-log" id="gameLog"></div>
 
-    let p1WrongGuesses = new Set();
-    let p2WrongGuesses = new Set();
+  <div class="action-panel" id="actionPanel"></div>
 
-    let p1Wins = 0;
-    let p2Wins = 0;
-    let ties = 0;
+</div>
+</div>
 
-    let p1Solved = false;
-    let p2Solved = false;
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(function(){
+"use strict";
 
-    let message = "Player 1";
-    let subMessage = "Secretly choose your number";
-    let footerMessage = "Player 2, look away 👀";
+/* ── DOM refs ── */
+const $=id=>document.getElementById(id);
+const lobbyContainer=$('lobbyContainer'), gameContainer=$('gameContainer');
+const nameInput=$('nameInput'), roomInput=$('roomInput');
+const hostBtn=$('hostBtn'), joinBtn=$('joinBtn');
+const lobbyStatus=$('lobbyStatus'), shareRow=$('shareRow'), shareLink=$('shareLink'), copyBtn=$('copyBtn');
+const gRoomBadge=$('gRoomBadge'), gP1Name=$('gP1Name'), gP2Name=$('gP2Name');
+const gP1Score=$('gP1Score'), gP2Score=$('gP2Score'), gRoundBadge=$('gRoundBadge');
+const mySecretDisplay=$('mySecretDisplay'), mySecretNum=$('mySecretNum');
+const gameLog=$('gameLog'), actionPanel=$('actionPanel');
 
-    let particles = [];
-    let pulse = 0;
-    let shake = 0;
+/* ── State ── */
+let peer=null, conn=null;
+let isHost=false, myPlayer=0; // 1 or 2
+let myName='', roomCode='';
+let myLocalSecret=null;       // only stored locally, never synced until round over
 
-    let onlineMode = false;
-    let isHost = false;
-    let myPlayer = 1;
-    let peer = null;
-    let conn = null;
-    let roomCode = "";
-    let hostReady = false;
-    let joinRetryTimer = null;
-    let joinAttempts = 0;
+// Canonical game state (host authoritative)
+let G={
+  phase:'lobby', // lobby | picking | playing | answering | roundOver
+  round:1,
+  currentTurn:1,
+  p1Name:'Player 1', p2Name:'Player 2',
+  p1Picked:false, p2Picked:false,
+  p1Secret:null, p2Secret:null,     // host stores both; only revealed in roundOver
+  scores:{p1:0, p2:0},
+  log:[],         // {text, cls}
+  pendingQuestion:null, // {from:1|2, text}
+  roundWinner:null,     // null|1|2
+  revealedNumbers:null, // null|{p1,p2}
+  totalRounds:0
+};
 
-    const BASE_WIDTH = 460;
-    const BASE_HEIGHT = 520;
-    const DEFAULT_ROOM_CODE = "hand-gesture-live";
+/* ── Helpers ── */
+function sanitizeRoom(v){return String(v||'').toLowerCase().replace(/[^a-z0-9\-]/g,'').slice(0,24)}
+function sanitizeName(v){return String(v||'').trim().slice(0,20)}
+function peerId(code){return 'snb-'+code}
+function statusMsg(txt,err){lobbyStatus.textContent=txt;lobbyStatus.classList.toggle('error',!!err)}
+function show(el){el.classList.remove('hidden')}
+function hide(el){el.classList.add('hidden')}
 
-    mainButton.addEventListener("click", handleAction);
-    resetButton.addEventListener("click", handleResetAction);
-    hostButton.addEventListener("click", hostRoom);
-    joinButton.addEventListener("click", joinRoom);
+function saveScores(){
+  try{localStorage.setItem('snb-scores-'+roomCode,JSON.stringify(G.scores))}catch(e){}
+}
+function loadScores(){
+  try{
+    const s=JSON.parse(localStorage.getItem('snb-scores-'+roomCode));
+    if(s&&typeof s.p1==='number'){G.scores=s}
+  }catch(e){}
+}
 
-    input.addEventListener("keydown", function(event) {
-      if (event.key === "Enter") {
-        handleAction();
-      }
-    });
+/* ── Prefill room from URL ── */
+const urlParams=new URLSearchParams(location.search);
+const urlRoom=sanitizeRoom(urlParams.get('room'));
+if(urlRoom) roomInput.value=urlRoom;
 
-    window.addEventListener("resize", resizeCanvas);
+/* ── Lobby actions ── */
+hostBtn.onclick=()=>{
+  const name=sanitizeName(nameInput.value);
+  const room=sanitizeRoom(roomInput.value);
+  if(!name){statusMsg('Please enter your name.',true);return}
+  if(!room){statusMsg('Please enter a room code.',true);return}
+  myName=name; roomCode=room; isHost=true; myPlayer=1;
+  hostBtn.disabled=joinBtn.disabled=true;
+  statusMsg('Creating room...');
+  initPeerHost();
+};
 
-    function resizeCanvas() {
-      canvas.width = BASE_WIDTH;
-      canvas.height = BASE_HEIGHT;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+joinBtn.onclick=()=>{
+  const name=sanitizeName(nameInput.value);
+  const room=sanitizeRoom(roomInput.value);
+  if(!name){statusMsg('Please enter your name.',true);return}
+  if(!room){statusMsg('Please enter a room code.',true);return}
+  myName=name; roomCode=room; isHost=false; myPlayer=2;
+  hostBtn.disabled=joinBtn.disabled=true;
+  statusMsg('Joining room...');
+  initPeerJoin();
+};
+
+copyBtn.onclick=()=>{
+  const url=location.origin+location.pathname+'?room='+roomCode;
+  navigator.clipboard.writeText(url).then(()=>{copyBtn.textContent='✅ Copied!'
+    setTimeout(()=>{copyBtn.textContent='📋 Copy'},2000)
+  }).catch(()=>{});
+};
+
+/* ── PeerJS Host ── */
+function initPeerHost(){
+  if(peer){peer.destroy();peer=null}
+  peer=new Peer(peerId(roomCode));
+  peer.on('open',()=>{
+    statusMsg('Room "'+roomCode+'" created! Share the link for Player 2 to join.');
+    const url=location.origin+location.pathname+'?room='+roomCode;
+    shareLink.textContent=url;
+    show(shareRow);
+    const u=new URL(location.href);u.searchParams.set('room',roomCode);
+    history.replaceState({},'',u.toString());
+  });
+  peer.on('connection',connection=>{
+    conn=connection;
+    setupHostConn();
+  });
+  peer.on('error',err=>{
+    if(err.type==='unavailable-id'){statusMsg('Room code "'+roomCode+'" is already in use. Try another.',true)}
+    else{statusMsg('Host error: '+err.type,true)}
+    hostBtn.disabled=joinBtn.disabled=false;
+  });
+}
+
+function setupHostConn(){
+  conn.on('open',()=>{
+    statusMsg('Player 2 connected!');
+  });
+  conn.on('data',msg=>{
+    handleHostMessage(msg);
+  });
+  conn.on('close',()=>{
+    statusMsg('Player 2 disconnected.',true);
+  });
+}
+
+/* ── PeerJS Join ── */
+let joinAttempts=0, joinTimer=null;
+function initPeerJoin(){
+  if(peer){peer.destroy();peer=null}
+  joinAttempts=0;
+  peer=new Peer();
+  peer.on('open',()=>{
+    attemptJoin();
+  });
+  peer.on('error',err=>{
+    if(err.type==='peer-unavailable'){
+      scheduleJoinRetry();
+    }else{
+      statusMsg('Join error: '+err.type,true);
+      hostBtn.disabled=joinBtn.disabled=false;
     }
+  });
+}
 
-    function sanitizeRoomCode(value) {
-      return String(value || "")
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, "")
-        .slice(0, 24);
+function attemptJoin(){
+  statusMsg('Connecting to room "'+roomCode+'"...');
+  conn=peer.connect(peerId(roomCode),{reliable:true});
+  conn.on('open',()=>{
+    if(joinTimer){clearTimeout(joinTimer);joinTimer=null}
+    conn.send({type:'join',name:myName});
+    statusMsg('Connected! Waiting for host...');
+  });
+  conn.on('data',msg=>{
+    handleP2Message(msg);
+  });
+  conn.on('close',()=>{
+    statusMsg('Disconnected from host.',true);
+  });
+  conn.on('error',err=>{
+    if(err.type==='peer-unavailable') scheduleJoinRetry();
+  });
+}
+
+function scheduleJoinRetry(){
+  joinAttempts++;
+  if(joinAttempts>=10){
+    statusMsg('Could not find room "'+roomCode+'". Make sure P1 created it first.',true);
+    hostBtn.disabled=joinBtn.disabled=false;
+    return;
+  }
+  statusMsg('Waiting for host... attempt '+joinAttempts+'/10');
+  joinTimer=setTimeout(()=>{
+    joinTimer=null;
+    // destroy old conn attempt
+    conn=null;
+    attemptJoin();
+  },1500);
+}
+
+/* ── HOST: message handler ── */
+function handleHostMessage(msg){
+  if(!msg||!msg.type)return;
+  switch(msg.type){
+    case 'join':
+      G.p2Name=sanitizeName(msg.name)||'Player 2';
+      G.p1Name=myName;
+      loadScores();
+      startPickingPhase();
+      conn.send({type:'welcome',hostName:myName,room:roomCode});
+      enterGame();
+      broadcastSync();
+      break;
+    case 'pick':
+      if(G.phase!=='picking')return;
+      const n=Number(msg.number);
+      if(!n||n<1||n>150)return;
+      G.p2Secret=n; G.p2Picked=true;
+      addLog('✅ '+G.p2Name+' locked in their number.','system');
+      if(G.p1Picked&&G.p2Picked) startPlayingPhase();
+      broadcastSync();
+      break;
+    case 'ask':
+      if(G.phase!=='playing'||G.currentTurn!==2)return;
+      const q=String(msg.question||'').trim().slice(0,200);
+      if(!q)return;
+      G.pendingQuestion={from:2,text:q};
+      G.phase='answering';
+      addLog('🔵 '+G.p2Name+' asks: "'+q+'"','question');
+      broadcastSync();
+      break;
+    case 'answer':
+      if(G.phase!=='answering'||!G.pendingQuestion||G.pendingQuestion.from!==1)return;
+      const ans=!!msg.value;
+      addLog('🟢 '+G.p2Name+' answers: '+(ans?'Yes ✓':'No ✗'),'answer');
+      G.pendingQuestion=null;
+      G.phase='playing';
+      G.currentTurn=2; // back to the asker's opponent? No — after answering, turn passes to answerer
+      // Turn logic: the asker was P1 (pendingQuestion.from===1 means P2 asked and P1 must answer... wait, let me re-check)
+      // pendingQuestion.from = who ASKED. If from===1, P1 asked, P2 answers. After P2 answers, turn goes to P2.
+      G.currentTurn=2;
+      broadcastSync();
+      break;
+    case 'guess':
+      if(G.phase!=='playing'||G.currentTurn!==2)return;
+      const g=Number(msg.number);
+      if(!g||g<1||g>150)return;
+      processGuess(2,g);
+      broadcastSync();
+      break;
+    case 'playAgain':
+      nextRound();
+      broadcastSync();
+      break;
+  }
+}
+
+/* ── P2: message handler ── */
+function handleP2Message(msg){
+  if(!msg||!msg.type)return;
+  if(msg.type==='welcome'){
+    myName=sanitizeName(nameInput.value);
+    roomCode=msg.room;
+    enterGame();
+  }
+  if(msg.type==='sync'){
+    // Apply state but don't overwrite our local secret with null
+    const incoming=msg.state;
+    // Preserve local secret
+    const savedSecret=myLocalSecret;
+    Object.assign(G,incoming);
+    myLocalSecret=savedSecret;
+    // If round over, secret is revealed in state
+    renderGame();
+  }
+}
+
+/* ── Game logic (host only) ── */
+function startPickingPhase(){
+  G.phase='picking'; G.p1Picked=false; G.p2Picked=false;
+  G.p1Secret=null; G.p2Secret=null;
+  G.pendingQuestion=null; G.roundWinner=null; G.revealedNumbers=null;
+  addLog('── Round '+G.round+' ──','round-divider');
+  addLog('Both players: secretly pick a number between 1 and 150.','system');
+}
+
+function startPlayingPhase(){
+  G.phase='playing'; G.currentTurn=1;
+  addLog('Both numbers locked! '+G.p1Name+' goes first.','system');
+}
+
+function processGuess(player,guess){
+  const targetSecret=player===1?G.p2Secret:G.p1Secret;
+  const guesserName=player===1?G.p1Name:G.p2Name;
+  if(guess===targetSecret){
+    addLog('🎯 '+guesserName+' guesses '+guess+' — CORRECT! 🎉','guess-correct');
+    G.roundWinner=player;
+    G.revealedNumbers={p1:G.p1Secret,p2:G.p2Secret};
+    if(player===1) G.scores.p1++; else G.scores.p2++;
+    G.totalRounds++;
+    G.phase='roundOver';
+    addLog('🏆 '+guesserName+' wins Round '+G.round+'!','winner-banner');
+    addLog('Secrets: '+G.p1Name+'='+G.p1Secret+', '+G.p2Name+'='+G.p2Secret,'system');
+    saveScores();
+  }else if(guess<targetSecret){
+    addLog('❌ '+guesserName+' guesses '+guess+' — Too Low ↑','guess-wrong');
+    G.currentTurn=player===1?2:1;
+  }else{
+    addLog('❌ '+guesserName+' guesses '+guess+' — Too High ↓','guess-wrong');
+    G.currentTurn=player===1?2:1;
+  }
+}
+
+function nextRound(){
+  G.round++;
+  startPickingPhase();
+  if(isHost) myLocalSecret=null;
+}
+
+function addLog(text,cls){
+  G.log.push({text,cls});
+}
+
+function broadcastSync(){
+  renderGame();
+  if(conn&&conn.open){
+    // Send state to P2 but strip P1's secret during play (P2 already knows their own)
+    const toSend=JSON.parse(JSON.stringify(G));
+    if(G.phase!=='roundOver'){
+      toSend.p1Secret=null;
+      // Also don't reveal P2's secret back (P2 knows it locally)
+      // Actually host stores p2Secret. We should not send it back as plaintext either.
+      toSend.p2Secret=null;
     }
+    conn.send({type:'sync',state:toSend});
+  }
+}
 
-    function getDesiredRoomCode() {
-      return sanitizeRoomCode(roomCodeInput.value) || DEFAULT_ROOM_CODE;
+/* ── Enter game screen ── */
+function enterGame(){
+  hide(lobbyContainer); show(gameContainer);
+  renderGame();
+}
+
+/* ── Render ── */
+function renderGame(){
+  // Header
+  gRoomBadge.textContent='🔗 '+roomCode;
+  gP1Name.textContent=G.p1Name;
+  gP2Name.textContent=G.p2Name;
+  gP1Name.classList.toggle('me',myPlayer===1);
+  gP2Name.classList.toggle('me',myPlayer===2);
+  gP1Score.textContent=G.scores.p1;
+  gP2Score.textContent=G.scores.p2;
+  gRoundBadge.textContent='Round '+G.round+(G.totalRounds?' · '+G.totalRounds+' played':'');
+
+  // My secret badge
+  if(myLocalSecret&&G.phase!=='roundOver'){
+    show(mySecretDisplay); mySecretNum.textContent=myLocalSecret;
+  }else if(G.phase==='roundOver'&&G.revealedNumbers){
+    show(mySecretDisplay);
+    mySecretNum.textContent=myPlayer===1?G.revealedNumbers.p1:G.revealedNumbers.p2;
+  }else{
+    hide(mySecretDisplay);
+  }
+
+  // Log
+  gameLog.innerHTML='';
+  G.log.forEach(entry=>{
+    const div=document.createElement('div');
+    div.className='log-entry '+(entry.cls||'');
+    div.textContent=entry.text;
+    gameLog.appendChild(div);
+  });
+  gameLog.scrollTop=gameLog.scrollHeight;
+
+  // Action panel
+  renderActionPanel();
+}
+
+function renderActionPanel(){
+  actionPanel.innerHTML='';
+  const me=myPlayer;
+  const opponentName=me===1?G.p2Name:G.p1Name;
+
+  if(G.phase==='picking'){
+    const picked=me===1?G.p1Picked:G.p2Picked;
+    if(picked){
+      actionPanel.innerHTML='<div class="waiting-msg">Waiting for opponent to pick their number<span class="dot-pulse">...</span></div>';
+    }else{
+      const label=document.createElement('div');label.className='action-label';label.textContent='Pick your secret number (1-150)';
+      const row=document.createElement('div');row.className='action-row';
+      const inp=document.createElement('input');inp.type='password';inp.inputMode='numeric';inp.placeholder='Your secret number';inp.id='pickInput';inp.min='1';inp.max='150';
+      const btn=document.createElement('button');btn.className='btn btn-primary';btn.textContent='Lock In 🔒';
+      btn.onclick=()=>handlePick(inp);
+      inp.onkeydown=e=>{if(e.key==='Enter')handlePick(inp)};
+      row.appendChild(inp);row.appendChild(btn);
+      actionPanel.appendChild(label);actionPanel.appendChild(row);
+      setTimeout(()=>inp.focus(),50);
     }
+    return;
+  }
 
-    function setOnlineStatus(text) {
-      onlineStatus.textContent = text;
+  if(G.phase==='answering'){
+    const q=G.pendingQuestion;
+    if(!q)return;
+    // The person who must answer is the opponent of the asker
+    const mustAnswer=q.from===1?2:1;
+    if(me===mustAnswer){
+      const wrap=document.createElement('div');
+      wrap.innerHTML='<div class="pending-q"><em>'+(q.from===1?G.p1Name:G.p2Name)+'</em> asks:<br>"'+escHtml(q.text)+'"</div>';
+      const label=document.createElement('div');label.className='action-label';label.textContent='Your answer:';
+      const btns=document.createElement('div');btns.className='answer-btns';
+      const yBtn=document.createElement('button');yBtn.className='btn btn-green';yBtn.textContent='👍 Yes';
+      const nBtn=document.createElement('button');nBtn.className='btn btn-primary';nBtn.textContent='👎 No';
+      yBtn.onclick=()=>handleAnswer(true);
+      nBtn.onclick=()=>handleAnswer(false);
+      btns.appendChild(yBtn);btns.appendChild(nBtn);
+      actionPanel.appendChild(wrap);actionPanel.appendChild(label);actionPanel.appendChild(btns);
+    }else{
+      actionPanel.innerHTML='<div class="waiting-msg">Waiting for '+opponentName+' to answer<span class="dot-pulse">...</span></div>';
     }
+    return;
+  }
 
-    function setRoomInUrl(code) {
-      const url = new URL(window.location.href);
-      url.searchParams.set("room", code);
-      window.history.replaceState({}, "", url.toString());
+  if(G.phase==='playing'){
+    if(G.currentTurn!==me){
+      actionPanel.innerHTML='<div class="waiting-msg">Waiting for '+(G.currentTurn===1?G.p1Name:G.p2Name)+'<span class="dot-pulse">...</span></div>';
+      return;
     }
-
-    function canPlayerAct(player) {
-      if (phase === "p1_set") {
-        return player === 1;
-      }
-
-      if (phase === "p2_set") {
-        return player === 2;
-      }
-
-      if (phase === "guessing") {
-        return player === currentPlayer;
-      }
-
-      return true;
-    }
-
-    function canLocalUserAct() {
-      // Block all game interaction until the player has hosted or joined
-      if (!onlineMode) {
-        return false;
-      }
-
-      if (isHost && !hostReady) {
-        return false;
-      }
-
-      return canPlayerAct(myPlayer);
-    }
-
-    function updateInputAvailability() {
-      const canAct = canLocalUserAct();
-      input.disabled = !canAct;
-      mainButton.disabled = !canAct;
-
-      if (isHost && !hostReady) {
-        setOnlineStatus(`Opening host room ${roomCode || getDesiredRoomCode()}...`);
-        return;
-      }
-
-      if (!onlineMode) {
-        setOnlineStatus(`Host this room as P1 or join as P2 to start playing.`);
-        return;
-      }
-
-      if (canAct) {
-        setOnlineStatus(`Online room ${roomCode}: your turn (P${myPlayer}).`);
-      } else {
-        setOnlineStatus(`Online room ${roomCode}: waiting for P${currentPlayer}.`);
-      }
-    }
-
-    function resetPeerState() {
-      if (joinRetryTimer) {
-        clearTimeout(joinRetryTimer);
-        joinRetryTimer = null;
-      }
-
-      joinAttempts = 0;
-      hostReady = false;
-
-      if (conn) {
-        conn = null;
-      }
-
-      if (peer) {
-        peer.destroy();
-        peer = null;
-      }
-    }
-
-    function getStateSnapshot() {
-      return {
-        p1Secret,
-        p2Secret,
-        phase,
-        currentPlayer,
-        p1Attempts,
-        p2Attempts,
-        p1WrongGuesses: Array.from(p1WrongGuesses),
-        p2WrongGuesses: Array.from(p2WrongGuesses),
-        p1Wins,
-        p2Wins,
-        ties,
-        p1Solved,
-        p2Solved,
-        message,
-        subMessage,
-        footerMessage,
-        inputType: input.type,
-        inputPlaceholder: input.placeholder,
-        mainButtonText: mainButton.textContent
-      };
-    }
-
-    function applyStateSnapshot(state) {
-      p1Secret = state.p1Secret;
-      p2Secret = state.p2Secret;
-      phase = state.phase;
-      currentPlayer = state.currentPlayer;
-      p1Attempts = state.p1Attempts;
-      p2Attempts = state.p2Attempts;
-      p1WrongGuesses = new Set(state.p1WrongGuesses || []);
-      p2WrongGuesses = new Set(state.p2WrongGuesses || []);
-      p1Wins = state.p1Wins;
-      p2Wins = state.p2Wins;
-      ties = state.ties;
-      p1Solved = state.p1Solved;
-      p2Solved = state.p2Solved;
-      message = state.message;
-      subMessage = state.subMessage;
-      footerMessage = state.footerMessage;
-      input.type = state.inputType || "number";
-      input.placeholder = state.inputPlaceholder || "Your guess";
-      input.min = (state.inputType === "number") ? "1" : "";
-      input.max = (state.inputType === "number") ? "150" : "";
-      mainButton.textContent = state.mainButtonText || "Guess";
-      // Only clear input if the player hasn't started typing something
-      if (!input.value || !canLocalUserAct()) {
-        input.value = "";
-      }
-      updateInputAvailability();
-    }
-
-    function broadcastState() {
-      if (onlineMode && isHost && conn && conn.open) {
-        conn.send({ type: "state", payload: getStateSnapshot() });
-      }
-      updateInputAvailability();
-    }
-
-    function attachConnHandlers(connection) {
-      conn = connection;
-
-      conn.on("data", data => {
-        if (isHost) {
-          if (data.type === "action") {
-            handleAction(data.value, true);
-          }
-
-          if (data.type === "reset") {
-            resetGame();
-            broadcastState();
-          }
-
-          return;
-        }
-
-        if (data.type === "state") {
-          applyStateSnapshot(data.payload);
-        }
-      });
-
-      conn.on("open", () => {
-        onlineMode = true;
-        setOnlineStatus(`Connected in room ${roomCode}. You are P${myPlayer}.`);
-        updateInputAvailability();
-        if (isHost) {
-          broadcastState();
-        }
-      });
-
-      conn.on("close", () => {
-        if (conn !== connection) {
-          return;
-        }
-
-        setOnlineStatus("Connection closed. You can host/join again.");
-        onlineMode = false;
-        conn = null;
-        updateInputAvailability();
-      });
-
-      conn.on("error", err => {
-        if (!isHost && err && err.type === "peer-unavailable") {
-          scheduleJoinRetry();
-          return;
-        }
-
-        setOnlineStatus(`Connection error in room ${roomCode}. Retry host/join.`);
-      });
-    }
-
-    function scheduleJoinRetry() {
-      if (joinAttempts >= 8) {
-        setOnlineStatus(`Join failed for room ${roomCode}. Make sure P1 tapped Host As P1 and keeps the page open.`);
-        return;
-      }
-
-      if (joinRetryTimer) {
-        clearTimeout(joinRetryTimer);
-      }
-
-      joinAttempts += 1;
-      setOnlineStatus(`Waiting for P1 in room ${roomCode}... retry ${joinAttempts}/8`);
-      joinRetryTimer = setTimeout(() => {
-        joinRetryTimer = null;
-        attemptJoinConnection();
-      }, 1200);
-    }
-
-    function attemptJoinConnection() {
-      if (!peer || !peer.open) {
-        return;
-      }
-
-      const connection = peer.connect(`secret-battle-${roomCode}`, { reliable: true });
-      attachConnHandlers(connection);
-      setOnlineStatus(`Joining room ${roomCode} as P2...`);
-    }
-
-    function hostRoom() {
-      const code = getDesiredRoomCode();
-      roomCodeInput.value = code;
-      roomCode = code;
-      myPlayer = 1;
-      isHost = true;
-
-      resetPeerState();
-      updateInputAvailability();
-
-      peer = new Peer(`secret-battle-${code}`);
-
-      peer.on("open", () => {
-        hostReady = true;
-        onlineMode = true;
-        setRoomInUrl(code);
-        setOnlineStatus(`Hosting room ${code} as P1. Player 2 can open this same page and tap Join As P2.`);
-        updateInputAvailability();
-      });
-
-      peer.on("connection", connection => {
-        attachConnHandlers(connection);
-      });
-
-      peer.on("error", err => {
-        hostReady = false;
-        setOnlineStatus(`Host error: ${err.type || "connection failed"}. Try Host As P1 again.`);
-      });
-    }
-
-    function joinRoom() {
-      const code = getDesiredRoomCode();
-
-      roomCode = code;
-      roomCodeInput.value = code;
-      myPlayer = 2;
-      isHost = false;
-
-      resetPeerState();
-
-      peer = new Peer();
-
-      peer.on("open", () => {
-        onlineMode = true;
-        attemptJoinConnection();
-      });
-
-      peer.on("error", err => {
-        if (err && err.type === "peer-unavailable") {
-          scheduleJoinRetry();
-          return;
-        }
-
-        setOnlineStatus(`Join error: ${err.type || "room unavailable"}.`);
-      });
-    }
-
-    function resetGame() {
-      p1Secret = null;
-      p2Secret = null;
-
-      phase = "p1_set";
-      currentPlayer = 1;
-
-      p1Attempts = 0;
-      p2Attempts = 0;
-
-      p1WrongGuesses.clear();
-      p2WrongGuesses.clear();
-
-      p1Solved = false;
-      p2Solved = false;
-
-      message = "Player 1";
-      subMessage = "Secretly choose your number";
-      footerMessage = "Player 2, look away 👀";
-
-      input.value = "";
-      input.type = "password";
-      input.placeholder = "1 - 150";
-      mainButton.textContent = "Lock P1 Number";
-
-      particles = [];
-      updateInputAvailability();
-    }
-
-    function handleResetAction() {
-      if (onlineMode && !isHost) {
-        if (conn && conn.open) {
-          conn.send({ type: "reset" });
-        }
-        return;
-      }
-
-      resetGame();
-      broadcastState();
-    }
-
-    function handleAction(forcedValue = null, fromRemote = false) {
-      if (onlineMode && !isHost && !fromRemote) {
-        if (!canLocalUserAct()) {
-          setOnlineStatus(`Room ${roomCode}: wait for your turn.`);
-          return;
-        }
-
-        const localValue = Number(input.value);
-        if (!localValue || localValue < 1 || localValue > 150) {
-          message = "Invalid Number";
-          subMessage = "Enter a number from 1 to 150";
-          footerMessage = "Try again";
-          shakeScreen();
-          return;
-        }
-
-        if (conn && conn.open) {
-          conn.send({ type: "action", value: localValue });
-          input.value = "";
-        } else {
-          setOnlineStatus(`Room ${roomCode}: not connected. Rejoin as P2.`);
-        }
-        return;
-      }
-
-      const actor = fromRemote ? 2 : myPlayer;
-      if (onlineMode && isHost && !canPlayerAct(actor) && phase !== "game_over") {
-        return;
-      }
-
-      const value = forcedValue !== null ? Number(forcedValue) : Number(input.value);
-
-      if (phase === "game_over") {
-        resetGame();
-        broadcastState();
-        return;
-      }
-
-      if (!value || value < 1 || value > 150) {
-        message = "Invalid Number";
-        subMessage = "Enter a number from 1 to 150";
-        footerMessage = "Try again";
-        shakeScreen();
-        // Don't broadcast invalid-number state to other player
-        updateInputAvailability();
-        return;
-      }
-
-      if (phase === "p1_set") {
-        p1Secret = value;
-
-        phase = "p2_set";
-        message = "Player 2";
-        subMessage = "Secretly choose your number";
-        footerMessage = "Player 1, look away 👀";
-
-        input.value = "";
-        input.type = "password";
-        mainButton.textContent = "Lock P2 Number";
-
-        spawnParticles("#00e5ff");
-        broadcastState();
-        return;
-      }
-
-      if (phase === "p2_set") {
-        p2Secret = value;
-
-        phase = "guessing";
-        currentPlayer = 1;
-
-        message = "Player 1 Guess";
-        subMessage = "Guess Player 2's secret number";
-        footerMessage = "Player 1 goes first";
-
-        input.value = "";
-        input.type = "number";
-        input.min = "1";
-        input.max = "150";
-        input.placeholder = "Your guess";
-        mainButton.textContent = "Guess";
-
-        burstParticles(["#ff007a", "#00e5ff"]);
-        broadcastState();
-        return;
-      }
-
-      if (phase === "guessing") {
-        makeGuess(value);
-      }
-    }
-
-    function makeGuess(guess) {
-      if (currentPlayer === 1) {
-        p1Attempts++;
-
-        if (guess === p2Secret) {
-          p1Solved = true;
-          message = "Player 1 Correct!";
-          subMessage = `Player 2's number was ${p2Secret}`;
-          footerMessage = `P1 solved it in ${p1Attempts} guesses!`;
-          burstParticles(["#ff007a", "#ffe600", "#00ff88"]);
-        } else if (guess < p2Secret) {
-          p1WrongGuesses.add(guess);
-          message = "P1: Too Low ↑";
-          subMessage = "Player 1, guess higher";
-          footerMessage = `P1 attempts: ${p1Attempts}`;
-          spawnParticles("#00e5ff");
-        } else {
-          p1WrongGuesses.add(guess);
-          message = "P1: Too High ↓";
-          subMessage = "Player 1, guess lower";
-          footerMessage = `P1 attempts: ${p1Attempts}`;
-          spawnParticles("#ff4fd8");
-        }
-
-        input.value = "";
-        checkWinner();
-        if (phase !== "game_over") {
-          // Give P2 a turn only if they haven't already solved
-          currentPlayer = p2Solved ? 1 : 2;
-        }
-        broadcastState();
-        return;
-      }
-
-      if (currentPlayer === 2) {
-        p2Attempts++;
-
-        if (guess === p1Secret) {
-          p2Solved = true;
-          message = "Player 2 Correct!";
-          subMessage = `Player 1's number was ${p1Secret}`;
-          footerMessage = `P2 solved it in ${p2Attempts} guesses!`;
-          burstParticles(["#00e5ff", "#ffe600", "#00ff88"]);
-        } else if (guess < p1Secret) {
-          p2WrongGuesses.add(guess);
-          message = "P2: Too Low ↑";
-          subMessage = "Player 2, guess higher";
-          footerMessage = `P2 attempts: ${p2Attempts}`;
-          spawnParticles("#00e5ff");
-        } else {
-          p2WrongGuesses.add(guess);
-          message = "P2: Too High ↓";
-          subMessage = "Player 2, guess lower";
-          footerMessage = `P2 attempts: ${p2Attempts}`;
-          spawnParticles("#ff4fd8");
-        }
-
-        input.value = "";
-        checkWinner();
-        if (phase !== "game_over") {
-          // Give P1 a turn only if they haven't already solved
-          currentPlayer = p1Solved ? 2 : 1;
-        }
-        broadcastState();
-      }
-    }
-
-    function checkWinner() {
-      if (p1Solved && p2Solved) {
-        phase = "game_over";
-        input.value = "";
-        input.type = "number";
-        mainButton.textContent = "Play Again";
-
-        if (p1Attempts < p2Attempts) {
-          p1Wins++;
-          message = "Player 1 Wins!";
-          subMessage = `P1: ${p1Attempts} guesses | P2: ${p2Attempts} guesses`;
-          footerMessage = "Fewer guesses wins";
-        } else if (p2Attempts < p1Attempts) {
-          p2Wins++;
-          message = "Player 2 Wins!";
-          subMessage = `P1: ${p1Attempts} guesses | P2: ${p2Attempts} guesses`;
-          footerMessage = "Fewer guesses wins";
-        } else {
-          ties++;
-          message = "It's A Tie!";
-          subMessage = `Both solved it in ${p1Attempts} guesses`;
-          footerMessage = "Rematch?";
-        }
-
-        burstParticles(["#ff007a", "#00e5ff", "#ffe600", "#00ff88", "#ffffff"]);
-      }
-    }
-
-    function spawnParticles(color) {
-      for (let i = 0; i < 22; i++) {
-        particles.push({
-          x: canvas.width / 2,
-          y: canvas.height / 2,
-          vx: (Math.random() - 0.5) * 6,
-          vy: (Math.random() - 0.5) * 6,
-          r: Math.random() * 5 + 2,
-          color: color,
-          life: 45
-        });
-      }
-    }
-
-    function burstParticles(colors) {
-      for (let i = 0; i < 110; i++) {
-        particles.push({
-          x: canvas.width / 2,
-          y: canvas.height / 2,
-          vx: (Math.random() - 0.5) * 12,
-          vy: (Math.random() - 0.5) * 12,
-          r: Math.random() * 6 + 2,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          life: 80
-        });
-      }
-    }
-
-    function shakeScreen() {
-      shake = 12;
-    }
-
-    function drawBackground(offsetX, offsetY) {
-      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      gradient.addColorStop(0, "#240046");
-      gradient.addColorStop(0.5, "#10002b");
-      gradient.addColorStop(1, "#030014");
-
-      ctx.fillStyle = gradient;
-      ctx.fillRect(offsetX, offsetY, canvas.width, canvas.height);
-
-      for (let i = 0; i < 30; i++) {
-        const x = (i * 53 + pulse * 1.7) % canvas.width;
-        const y = (i * 79 + pulse * 1.2) % canvas.height;
-
-        ctx.fillStyle = "rgba(255,255,255,0.07)";
-        ctx.beginPath();
-        ctx.arc(x + offsetX, y + offsetY, 2 + Math.sin(pulse / 12 + i) * 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
-      ctx.lineWidth = 2;
-
-      for (let i = 0; i < 7; i++) {
-        ctx.beginPath();
-        ctx.arc(
-          canvas.width / 2 + offsetX,
-          canvas.height / 2 + offsetY,
-          70 + i * 25 + Math.sin(pulse / 20) * 5,
-          0,
-          Math.PI * 2
-        );
-        ctx.stroke();
-      }
-    }
-
-    function drawParticles(offsetX, offsetY) {
-      particles.forEach((p, index) => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life--;
-
-        ctx.globalAlpha = Math.max(0, p.life / 80);
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x + offsetX, p.y + offsetY, p.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-
-        if (p.life <= 0) {
-          particles.splice(index, 1);
-        }
-      });
-    }
-
-    function drawText(offsetX, offsetY) {
-      ctx.textAlign = "center";
-
-      ctx.fillStyle = "rgba(255,255,255,0.7)";
-      ctx.font = "bold 15px Arial";
-      ctx.fillText("SECRET NUMBER BATTLE", canvas.width / 2 + offsetX, 34 + offsetY);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 34px Arial";
-      ctx.shadowColor = "#ff4fd8";
-      ctx.shadowBlur = 20;
-      ctx.fillText(message, canvas.width / 2 + offsetX, 82 + offsetY);
-
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = "17px Arial";
-      ctx.fillText(subMessage, canvas.width / 2 + offsetX, 116 + offsetY);
-
-      ctx.fillStyle = "#ffe600";
-      ctx.font = "bold 22px Arial";
-      ctx.fillText("Range: 1 - 150", canvas.width / 2 + offsetX, 148 + offsetY);
-
-      ctx.fillStyle = "#00ff88";
-      ctx.font = "bold 17px Arial";
-      ctx.fillText(`P1 Guesses: ${p1Attempts}`, canvas.width / 2 + offsetX, 176 + offsetY);
-
-      ctx.fillStyle = "#00e5ff";
-      ctx.font = "bold 17px Arial";
-      ctx.fillText(`P2 Guesses: ${p2Attempts}`, canvas.width / 2 + offsetX, 198 + offsetY);
-
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.font = "bold 15px Arial";
-      ctx.fillText(`Wins  P1: ${p1Wins}  |  P2: ${p2Wins}  |  Ties: ${ties}`, canvas.width / 2 + offsetX, 218 + offsetY);
-
-      const boardOwner = currentPlayer === 1 ? "P1" : "P2";
-      ctx.fillStyle = "rgba(255,255,255,0.72)";
-      ctx.font = "14px Arial";
-      ctx.fillText(`${boardOwner} Guess Board (grey = wrong)`, canvas.width / 2 + offsetX, 236 + offsetY);
-
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
-      ctx.font = "15px Arial";
-      ctx.fillText(footerMessage, canvas.width / 2 + offsetX, 500 + offsetY);
-    }
-
-    function drawNumberGrid(offsetX, offsetY) {
-      const gridX = 22 + offsetX;
-      const gridY = 246 + offsetY;
-      const cols = 15;
-      const rows = 10;
-      const cellW = 27;
-      const cellH = 22;
-      const activeWrongGuesses = currentPlayer === 1 ? p1WrongGuesses : p2WrongGuesses;
-
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.fillRect(gridX - 8, gridY - 12, cols * cellW + 16, rows * cellH + 16);
-
-      for (let n = 1; n <= 150; n++) {
-        const idx = n - 1;
-        const col = idx % cols;
-        const row = Math.floor(idx / cols);
-
-        const x = gridX + col * cellW + cellW / 2;
-        const y = gridY + row * cellH + 15;
-
-        if (activeWrongGuesses.has(n)) {
-          ctx.fillStyle = "rgba(165,165,165,0.82)";
-        } else {
-          ctx.fillStyle = "rgba(255,255,255,0.95)";
-        }
-
-        ctx.font = "12px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(String(n), x, y);
-      }
-    }
-
-    function draw() {
-      pulse++;
-
-      let offsetX = 0;
-      let offsetY = 0;
-
-      if (shake > 0) {
-        offsetX = (Math.random() - 0.5) * shake;
-        offsetY = (Math.random() - 0.5) * shake;
-        shake *= 0.85;
-      }
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      drawBackground(offsetX, offsetY);
-      drawParticles(offsetX, offsetY);
-      drawText(offsetX, offsetY);
-      drawNumberGrid(offsetX, offsetY);
-
-      requestAnimationFrame(draw);
-    }
-
-    const initialRoomCode = sanitizeRoomCode(new URLSearchParams(window.location.search).get("room")) || DEFAULT_ROOM_CODE;
-    roomCodeInput.value = initialRoomCode;
-    setOnlineStatus(`Room ${initialRoomCode} ready. Player 1 taps Host As P1, Player 2 taps Join As P2.`);
-
-    resizeCanvas();
-    resetGame();
-    draw();
-  </script>
+    // My turn — show mode buttons
+    const label=document.createElement('div');label.className='action-label';label.textContent='Your turn — choose an action:';
+    const mbtns=document.createElement('div');mbtns.className='mode-btns';
+    const askBtn=document.createElement('button');askBtn.className='btn btn-secondary';askBtn.textContent='❓ Ask Question';
+    const guessBtn=document.createElement('button');guessBtn.className='btn btn-primary';guessBtn.textContent='🎯 Guess Number';
+    askBtn.onclick=()=>showAskUI();
+    guessBtn.onclick=()=>showGuessUI();
+    mbtns.appendChild(askBtn);mbtns.appendChild(guessBtn);
+    actionPanel.appendChild(label);actionPanel.appendChild(mbtns);
+    return;
+  }
+
+  if(G.phase==='roundOver'){
+    const wrap=document.createElement('div');wrap.className='play-again-wrap';
+    const btn=document.createElement('button');btn.className='btn btn-yellow';btn.textContent='🔄 Play Again';
+    btn.onclick=()=>handlePlayAgain();
+    wrap.appendChild(btn);
+    actionPanel.appendChild(wrap);
+    return;
+  }
+
+  // Lobby fallback
+  actionPanel.innerHTML='<div class="waiting-msg">Waiting for game to start<span class="dot-pulse">...</span></div>';
+}
+
+function showAskUI(){
+  actionPanel.innerHTML='';
+  const label=document.createElement('div');label.className='action-label';label.textContent='Ask a yes/no question:';
+  const row=document.createElement('div');row.className='action-row';
+  const inp=document.createElement('input');inp.type='text';inp.placeholder='e.g. Is it more than 50?';inp.id='askInput';inp.maxLength=200;
+  const btn=document.createElement('button');btn.className='btn btn-secondary';btn.textContent='Send';
+  const back=document.createElement('button');back.className='btn btn-outline btn-sm';back.textContent='← Back';back.style.marginTop='8px';
+  btn.onclick=()=>handleAsk(inp);
+  inp.onkeydown=e=>{if(e.key==='Enter')handleAsk(inp)};
+  back.onclick=()=>renderActionPanel();
+  row.appendChild(inp);row.appendChild(btn);
+  actionPanel.appendChild(label);actionPanel.appendChild(row);actionPanel.appendChild(back);
+  setTimeout(()=>inp.focus(),50);
+}
+
+function showGuessUI(){
+  actionPanel.innerHTML='';
+  const label=document.createElement('div');label.className='action-label';label.textContent='Guess their secret number (1-150):';
+  const row=document.createElement('div');row.className='action-row';
+  const inp=document.createElement('input');inp.type='number';inp.min='1';inp.max='150';inp.placeholder='Your guess';inp.id='guessInput';inp.inputMode='numeric';
+  const btn=document.createElement('button');btn.className='btn btn-primary';btn.textContent='Guess!';
+  const back=document.createElement('button');back.className='btn btn-outline btn-sm';back.textContent='← Back';back.style.marginTop='8px';
+  btn.onclick=()=>handleGuess(inp);
+  inp.onkeydown=e=>{if(e.key==='Enter')handleGuess(inp)};
+  back.onclick=()=>renderActionPanel();
+  row.appendChild(inp);row.appendChild(btn);
+  actionPanel.appendChild(label);actionPanel.appendChild(row);actionPanel.appendChild(back);
+  setTimeout(()=>inp.focus(),50);
+}
+
+/* ── Action handlers ── */
+function handlePick(inp){
+  const v=Number(inp.value);
+  if(!v||v<1||v>150){inp.style.borderColor='#ff4f6f';return}
+  myLocalSecret=v;
+  if(isHost){
+    G.p1Secret=v; G.p1Picked=true;
+    addLog('✅ '+G.p1Name+' locked in their number.','system');
+    if(G.p1Picked&&G.p2Picked) startPlayingPhase();
+    broadcastSync();
+  }else{
+    conn.send({type:'pick',number:v});
+    // Optimistic UI: show waiting
+    renderGame();
+  }
+}
+
+function handleAsk(inp){
+  const q=String(inp.value||'').trim();
+  if(!q){inp.style.borderColor='#ff4f6f';return}
+  if(isHost){
+    G.pendingQuestion={from:1,text:q};
+    G.phase='answering';
+    addLog('🔵 '+G.p1Name+' asks: "'+q+'"','question');
+    broadcastSync();
+  }else{
+    conn.send({type:'ask',question:q});
+  }
+}
+
+function handleAnswer(val){
+  if(isHost){
+    // Host is answering (which means P2 asked → pendingQuestion.from===2)
+    const ans=!!val;
+    addLog('🟢 '+G.p1Name+' answers: '+(ans?'Yes ✓':'No ✗'),'answer');
+    G.pendingQuestion=null;
+    G.phase='playing';
+    // After P1 answers P2's question, turn goes to P1
+    G.currentTurn=1;
+    broadcastSync();
+  }else{
+    conn.send({type:'answer',value:val});
+  }
+}
+
+function handleGuess(inp){
+  const v=Number(inp.value);
+  if(!v||v<1||v>150){inp.style.borderColor='#ff4f6f';return}
+  if(isHost){
+    processGuess(1,v);
+    broadcastSync();
+  }else{
+    conn.send({type:'guess',number:v});
+  }
+}
+
+function handlePlayAgain(){
+  if(isHost){
+    nextRound();
+    myLocalSecret=null;
+    broadcastSync();
+  }else{
+    myLocalSecret=null;
+    conn.send({type:'playAgain'});
+  }
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+})();
+</script>
 </body>
 </html>
